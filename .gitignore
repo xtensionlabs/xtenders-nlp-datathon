@@ -1,0 +1,17 @@
+﻿# Model Weights
+models/
+*.pt
+*.pkl
+*.bin
+
+# Python Caching & Environments
+__pycache__/
+*.pyc
+.env
+venv/
+.venv/
+env/
+
+# OS Specific
+.DS_Store
+Thumbs.db

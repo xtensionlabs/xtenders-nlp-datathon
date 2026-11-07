@@ -1,0 +1,506 @@
+{
+  "model_name": "castorini/afriberta_large",
+  "slot_decoder": "constrained_linear_chain_crf",
+  "slot_value_augmentation": {
+    "enabled": true,
+    "generated_examples": 138,
+    "replacement_policy": "same intent, slot type, and whitespace word count"
+  },
+  "seed": 42,
+  "best_epoch": 8,
+  "best_validation_joint_score": 0.8614432989690721,
+  "split_sizes": {
+    "train": 150,
+    "validation": 50,
+    "test": 50
+  },
+  "intent_labels": [
+    "alarm_set",
+    "calendar_query",
+    "calendar_set",
+    "datetime_query",
+    "general_qa",
+    "iot_wemo",
+    "news_query",
+    "play_music",
+    "take_note",
+    "weather_query"
+  ],
+  "slot_labels": [
+    "O",
+    "B-date",
+    "I-date",
+    "B-item",
+    "I-item",
+    "B-location",
+    "I-location",
+    "B-term",
+    "I-term",
+    "B-time",
+    "I-time"
+  ],
+  "test": {
+    "intent_accuracy": 1.0,
+    "slot_f1_seqeval": 0.7208121827411168,
+    "joint_score": 0.8604060913705585,
+    "loss": 0.4654936428580965,
+    "examples": 50
+  },
+  "error_analysis": [
+    {
+      "record_ID": "rec_021",
+      "text": "Weka kengele dakika tano kabla ya saa saba.",
+      "failed_tasks": [
+        "slots"
+      ],
+      "expected": {
+        "intent": "alarm_set",
+        "slot_tags": [
+          "O",
+          "O",
+          "B-time",
+          "I-time",
+          "I-time",
+          "I-time",
+          "I-time",
+          "I-time"
+        ],
+        "slots": [
+          {
+            "type": "time",
+            "value": "dakika tano kabla ya saa saba",
+            "start": 13,
+            "end": 42
+          }
+        ]
+      },
+      "predicted": {
+        "intent": "alarm_set",
+        "slot_tags": [
+          "O",
+          "O",
+          "B-time",
+          "I-time",
+          "I-time",
+          "I-time",
+          "B-time",
+          "I-time"
+        ],
+        "slots": [
+          {
+            "type": "time",
+            "value": "dakika tano kabla ya",
+            "word_start": 2,
+            "word_end": 6
+          },
+          {
+            "type": "time",
+            "value": "saa saba.",
+            "word_start": 6,
+            "word_end": 8
+          }
+        ]
+      }
+    },
+    {
+      "record_ID": "rec_024",
+      "text": "Kengele ilie saa 08:00 kila siku ya kazi.",
+      "failed_tasks": [
+        "slots"
+      ],
+      "expected": {
+        "intent": "alarm_set",
+        "slot_tags": [
+          "O",
+          "O",
+          "B-time",
+          "I-time",
+          "B-date",
+          "I-date",
+          "I-date",
+          "I-date"
+        ],
+        "slots": [
+          {
+            "type": "time",
+            "value": "saa 08:00",
+            "start": 13,
+            "end": 22
+          },
+          {
+            "type": "date",
+            "value": "kila siku ya kazi",
+            "start": 23,
+            "end": 40
+          }
+        ]
+      },
+      "predicted": {
+        "intent": "alarm_set",
+        "slot_tags": [
+          "O",
+          "O",
+          "B-time",
+          "I-time",
+          "B-date",
+          "I-date",
+          "O",
+          "B-item"
+        ],
+        "slots": [
+          {
+            "type": "time",
+            "value": "saa 08:00",
+            "word_start": 2,
+            "word_end": 4
+          },
+          {
+            "type": "date",
+            "value": "kila siku",
+            "word_start": 4,
+            "word_end": 6
+          },
+          {
+            "type": "item",
+            "value": "kazi.",
+            "word_start": 7,
+            "word_end": 8
+          }
+        ]
+      }
+    },
+    {
+      "record_ID": "rec_048",
+      "text": "Nionyeshe shughuli za tarehe 5 mwezi ujao shuleni.",
+      "failed_tasks": [
+        "slots"
+      ],
+      "expected": {
+        "intent": "calendar_query",
+        "slot_tags": [
+          "O",
+          "B-item",
+          "O",
+          "B-date",
+          "I-date",
+          "I-date",
+          "I-date",
+          "B-location"
+        ],
+        "slots": [
+          {
+            "type": "item",
+            "value": "shughuli",
+            "start": 10,
+            "end": 18
+          },
+          {
+            "type": "date",
+            "value": "tarehe 5 mwezi ujao",
+            "start": 22,
+            "end": 41
+          },
+          {
+            "type": "location",
+            "value": "shuleni",
+            "start": 42,
+            "end": 49
+          }
+        ]
+      },
+      "predicted": {
+        "intent": "calendar_query",
+        "slot_tags": [
+          "O",
+          "B-item",
+          "O",
+          "B-date",
+          "I-date",
+          "I-date",
+          "I-date",
+          "I-date"
+        ],
+        "slots": [
+          {
+            "type": "item",
+            "value": "shughuli",
+            "word_start": 1,
+            "word_end": 2
+          },
+          {
+            "type": "date",
+            "value": "tarehe 5 mwezi ujao shuleni.",
+            "word_start": 3,
+            "word_end": 8
+          }
+        ]
+      }
+    },
+    {
+      "record_ID": "rec_074",
+      "text": "Hifadhi ratiba ya sherehe ya shule tarehe 27 Septemba saa tisa alasiri kwenye uwanja wa shule.",
+      "failed_tasks": [
+        "slots"
+      ],
+      "expected": {
+        "intent": "calendar_set",
+        "slot_tags": [
+          "O",
+          "O",
+          "O",
+          "B-item",
+          "I-item",
+          "I-item",
+          "B-date",
+          "I-date",
+          "I-date",
+          "B-time",
+          "I-time",
+          "I-time",
+          "O",
+          "B-location",
+          "I-location",
+          "I-location"
+        ],
+        "slots": [
+          {
+            "type": "item",
+            "value": "sherehe ya shule",
+            "start": 18,
+            "end": 34
+          },
+          {
+            "type": "date",
+            "value": "tarehe 27 Septemba",
+            "start": 35,
+            "end": 53
+          },
+          {
+            "type": "time",
+            "value": "saa tisa alasiri",
+            "start": 54,
+            "end": 70
+          },
+          {
+            "type": "location",
+            "value": "uwanja wa shule",
+            "start": 78,
+            "end": 93
+          }
+        ]
+      },
+      "predicted": {
+        "intent": "calendar_set",
+        "slot_tags": [
+          "O",
+          "B-item",
+          "I-item",
+          "I-item",
+          "I-item",
+          "I-item",
+          "B-date",
+          "I-date",
+          "I-date",
+          "B-time",
+          "I-time",
+          "I-time",
+          "O",
+          "B-location",
+          "I-location",
+          "I-location"
+        ],
+        "slots": [
+          {
+            "type": "item",
+            "value": "ratiba ya sherehe ya shule",
+            "word_start": 1,
+            "word_end": 6
+          },
+          {
+            "type": "date",
+            "value": "tarehe 27 Septemba",
+            "word_start": 6,
+            "word_end": 9
+          },
+          {
+            "type": "time",
+            "value": "saa tisa alasiri",
+            "word_start": 9,
+            "word_end": 12
+          },
+          {
+            "type": "location",
+            "value": "uwanja wa shule.",
+            "word_start": 13,
+            "word_end": 16
+          }
+        ]
+      }
+    },
+    {
+      "record_ID": "rec_097",
+      "text": "Saa katika Addis Ababa ni ngapi kwa sasa?",
+      "failed_tasks": [
+        "slots"
+      ],
+      "expected": {
+        "intent": "datetime_query",
+        "slot_tags": [
+          "O",
+          "O",
+          "B-location",
+          "I-location",
+          "O",
+          "O",
+          "B-time",
+          "I-time"
+        ],
+        "slots": [
+          {
+            "type": "location",
+            "value": "Addis Ababa",
+            "start": 11,
+            "end": 22
+          },
+          {
+            "type": "time",
+            "value": "kwa sasa",
+            "start": 32,
+            "end": 40
+          }
+        ]
+      },
+      "predicted": {
+        "intent": "datetime_query",
+        "slot_tags": [
+          "O",
+          "O",
+          "B-location",
+          "B-location",
+          "O",
+          "O",
+          "B-time",
+          "I-time"
+        ],
+        "slots": [
+          {
+            "type": "location",
+            "value": "Addis",
+            "word_start": 2,
+            "word_end": 3
+          },
+          {
+            "type": "location",
+            "value": "Ababa",
+            "word_start": 3,
+            "word_end": 4
+          },
+          {
+            "type": "time",
+            "value": "kwa sasa?",
+            "word_start": 6,
+            "word_end": 8
+          }
+        ]
+      }
+    }
+  ],
+  "training_history": [
+    {
+      "epoch": 1,
+      "train_loss": 3.796761671702067,
+      "skipped_optimizer_steps": 2,
+      "validation": {
+        "loss": 3.124516044344221,
+        "intent_accuracy": 0.6,
+        "slot_f1": 0.10169491525423728,
+        "joint_score": 0.3508474576271186,
+        "examples": 50
+      }
+    },
+    {
+      "epoch": 2,
+      "train_loss": 2.417515824238459,
+      "skipped_optimizer_steps": 0,
+      "validation": {
+        "loss": 1.8958774294172014,
+        "intent_accuracy": 0.88,
+        "slot_f1": 0.34285714285714286,
+        "joint_score": 0.6114285714285714,
+        "examples": 50
+      }
+    },
+    {
+      "epoch": 3,
+      "train_loss": 1.3464013652669058,
+      "skipped_optimizer_steps": 0,
+      "validation": {
+        "loss": 1.2040395396096366,
+        "intent_accuracy": 0.92,
+        "slot_f1": 0.503225806451613,
+        "joint_score": 0.7116129032258065,
+        "examples": 50
+      }
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.7340008517106374,
+      "skipped_optimizer_steps": 0,
+      "validation": {
+        "loss": 0.8438620482172284,
+        "intent_accuracy": 0.96,
+        "slot_f1": 0.588235294117647,
+        "joint_score": 0.7741176470588235,
+        "examples": 50
+      }
+    },
+    {
+      "epoch": 5,
+      "train_loss": 0.4212694946262572,
+      "skipped_optimizer_steps": 0,
+      "validation": {
+        "loss": 0.6947442420891353,
+        "intent_accuracy": 0.96,
+        "slot_f1": 0.659217877094972,
+        "joint_score": 0.8096089385474861,
+        "examples": 50
+      }
+    },
+    {
+      "epoch": 6,
+      "train_loss": 0.26414594882064396,
+      "skipped_optimizer_steps": 0,
+      "validation": {
+        "loss": 0.573884802205222,
+        "intent_accuracy": 0.98,
+        "slot_f1": 0.7195767195767195,
+        "joint_score": 0.8497883597883598,
+        "examples": 50
+      }
+    },
+    {
+      "epoch": 7,
+      "train_loss": 0.186481057976683,
+      "skipped_optimizer_steps": 0,
+      "validation": {
+        "loss": 0.5438234380313328,
+        "intent_accuracy": 0.96,
+        "slot_f1": 0.7434554973821991,
+        "joint_score": 0.8517277486910995,
+        "examples": 50
+      }
+    },
+    {
+      "epoch": 8,
+      "train_loss": 0.15129834599792957,
+      "skipped_optimizer_steps": 0,
+      "validation": {
+        "loss": 0.5257153723921094,
+        "intent_accuracy": 0.96,
+        "slot_f1": 0.7628865979381444,
+        "joint_score": 0.8614432989690721,
+        "examples": 50
+      }
+    }
+  ]
+}
