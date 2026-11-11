@@ -207,7 +207,28 @@ print("Saved run artifacts to", TEAM_RUN_DIR)
 Keep `best_model.pt` beside its matching `metrics_and_errors.json`. Do not use
 the old Drive checkpoint ID or replace final metrics with a historical run.
 
-## Cell 8 — Teammate launcher for the Sauti demo
+## Cell 8 — Open the Sauti interface after training
+
+Run this in the same Colab session after Cell 5 has created
+`/content/track_c_final`. The cell loads the final model and renders the
+interactive Sauti interface directly in its output.
+
+```python
+from pathlib import Path
+import os
+import runpy
+
+REPO = Path("/content/xtenders-nlp-datathon")
+MODEL_DIR = Path("/content/track_c_final")
+for filename in ("best_model.pt", "metrics_and_errors.json"):
+    if not (MODEL_DIR / filename).is_file():
+        raise FileNotFoundError(f"Missing {MODEL_DIR / filename}; complete the final training cell first.")
+
+os.environ["TRACK_C_MODEL_DIR"] = str(MODEL_DIR)
+runpy.run_path(str(REPO / "sauti" / "colab_demo.py"), run_name="__main__")
+```
+
+## Cell 9 — Teammate launcher for the Sauti demo
 
 You run Cell 7 once after training. Give teammates **Viewer** access to the
 shared Drive folder. Each teammate adds its shortcut to My Drive once; after
