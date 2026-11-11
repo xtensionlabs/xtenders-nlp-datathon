@@ -47,22 +47,6 @@ are ignored by Git; arrange judge access to the checkpoint and matching
 metadata, or include a reproducible download location and hashes in the final
 manifest.
 
-## Deploy on Azure
-
-From the repository root in Azure Cloud Shell (Bash), place the final run's
-`metrics_and_errors.json` in `models/track_c_final/`. Set
-`TRACK_C_CHECKPOINT_ID` to the Drive file ID for the matching final
-`best_model.pt`. The Azure build needs download access to that file.
-
-```bash
-export TRACK_C_CHECKPOINT_ID='your-final-checkpoint-drive-id'
-bash sauti/deploy-azure.sh sauti-rg westeurope youruniqueregistryname
-```
-
-Use a region allowed by your subscription and a globally unique registry name.
-The script builds the image, verifies that Sauti can load the final checkpoint,
-and prints a public HTTPS URL. Azure resources can incur charges.
-
 ## Demo evidence checklist
 
 - Show a request with an intent and several extracted slots.
