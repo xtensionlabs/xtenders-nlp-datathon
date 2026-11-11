@@ -227,7 +227,7 @@ for filename in ("best_model.pt", "metrics_and_errors.json"):
         raise FileNotFoundError(f"Missing {MODEL_DIR / filename}; complete the final training cell first.")
 
 os.environ["TRACK_C_MODEL_DIR"] = str(MODEL_DIR)
-runpy.run_path(str(REPO / "sauti" / "colab_demo.py"), run_name="__main__")
+_ = runpy.run_path(str(REPO / "sauti" / "colab_demo.py"), run_name="__main__")
 ```
 
 ## Cell 9 — Teammate launcher for the Sauti demo
@@ -277,7 +277,7 @@ for filename in ("best_model.pt", "metrics_and_errors.json"):
 
 os.environ["TRACK_C_MODEL_DIR"] = str(local_model)
 os.chdir(REPO)
-runpy.run_path(str(REPO / "sauti" / "colab_demo.py"), run_name="__main__")
+_ = runpy.run_path(str(REPO / "sauti" / "colab_demo.py"), run_name="__main__")
 ```
 
 The previous `gdown` ID fetched the historical model. This launcher reads the
