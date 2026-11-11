@@ -47,13 +47,15 @@ if missing:
     )
 
 print("Repository:", REPO)
-subprocess.run(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"], check=True)
+revision = subprocess.run(
+    ["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"],
+    check=True, capture_output=True, text=True,
+).stdout.strip()
+print("Git commit:", revision)
 ```
 
-The guard matters for this checkout: at the time these cells were prepared,
-GitHub `main` and `sauti-app` had no new commits, and the Track C changes in
-this workspace had not been published. The cell stops if a clone would use the
-old data or scripts.
+The guard checks that the cloned `main` contains the current Track C dataset
+and scripts before training, preventing a run against an older project version.
 
 ## Cell 2 — Install model dependencies and confirm GPU
 

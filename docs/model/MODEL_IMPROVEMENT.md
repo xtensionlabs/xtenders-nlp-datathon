@@ -70,7 +70,7 @@ The improved run adds two targeted changes:
    replacing one slot value with a value from the training split that has the
    same intent, slot type, and word count. Original examples remain in the
    training data; validation and test rows are never used for augmentation.
-   On the current split and seed 42, this creates 138 additional rows. Data
+   On the current split and seed 42, this creates 133 additional rows. Data
    augmentation has helped small NER datasets in published experiments, but
    its value must be measured on this Kiswahili task ([Dai & Adel, COLING 2020](https://aclanthology.org/2020.coling-main.343/)).
    The script writes a CSV preview with source IDs and replaced values for

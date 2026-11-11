@@ -759,7 +759,7 @@ def evaluate(
     scored = evaluate_track_c(
         gold_records,
         predicted_frames,
-        training_slot_values=training_slot_values,
+        train_slot_values=training_slot_values,
         labels=intent_labels,
     )
     scored["loss"] = total_loss / max(batch_count, 1)
