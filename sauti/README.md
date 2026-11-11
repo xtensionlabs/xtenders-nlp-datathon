@@ -19,7 +19,7 @@ correct parse.
 
 ## Run in Google Colab
 
-Open the team's [Sauti Colab demo](https://colab.research.google.com/drive/1_Zz6qY-MJbF5CKRsMzEESwLqzGEHT9Xo#scrollTo=gng68AWYvVr0) and run **Open the Sauti app** after final training artifacts are available. The helper reads `TRACK_C_MODEL_DIR`; it can download a checkpoint when `TRACK_C_CHECKPOINT_ID` is set. It validates matching metrics and rejects legacy labels or incomplete Track C evaluation. Colab needs internet access for dependencies and the AfriBERTa tokenizer/configuration.
+Open the team's [Sauti Colab demo](https://colab.research.google.com/drive/1_Zz6qY-MJbF5CKRsMzEESwLqzGEHT9Xo#scrollTo=gng68AWYvVr0) and run **Open the Sauti app** after final training artifacts are available. For use after a runtime reset or by another teammate, mount the team-shared Drive folder and set `TRACK_C_MODEL_DIR` to its `track_c_final` directory; the checkpoint and matching metrics persist there. The helper can also download a published checkpoint when `TRACK_C_CHECKPOINT_ID` is set, while requiring the matching metrics locally. It validates the metadata and rejects legacy labels or incomplete Track C evaluation. Colab needs internet access for dependencies and the AfriBERTa tokenizer/configuration.
 
 ## Run locally on Windows
 

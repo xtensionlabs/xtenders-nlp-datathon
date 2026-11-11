@@ -173,8 +173,14 @@ cat /content/track_c_comparison.md
 ## Cell 7 — Keep the run artifacts in Google Drive
 
 This preserves the final checkpoint and the evidence needed to reproduce and
-review the result. The validation folders contain checkpoints and can take
-substantial Drive space.
+review the result after `/content` is cleared. Put this folder in a **Team
+shared folder or Shared Drive** and grant access to every teammate. A folder in
+your personal `MyDrive` is only persistent for accounts that can access it.
+For a Shared Drive, change `TEAM_RUN_DIR` to
+`/content/drive/Shareddrives/<shared-drive-name>/Team_22_Track_C_Run`. For a
+folder shared with you, add a shortcut to `MyDrive` and use that mounted path.
+The validation folders contain checkpoints and can take substantial Drive
+space.
 
 ```python
 from google.colab import drive
@@ -182,9 +188,9 @@ from pathlib import Path
 import shutil
 
 drive.mount("/content/drive")
+TEAM_RUN_DIR = Path("/content/drive/MyDrive/Team_22_Track_C_Run")  # set this to the shared team folder
+TEAM_RUN_DIR.mkdir(parents=True, exist_ok=True)
 source = Path("/content")
-destination = Path("/content/drive/MyDrive/Team_22_Track_C_Run")
-destination.mkdir(parents=True, exist_ok=True)
 
 folders = [
     "track_c_final", "track_c_baselines",
@@ -192,21 +198,65 @@ folders = [
 ]
 files = ["validation_model_selection.md", "track_c_comparison.md"]
 for name in folders:
-    shutil.copytree(source / name, destination / name, dirs_exist_ok=True)
+    shutil.copytree(source / name, TEAM_RUN_DIR / name, dirs_exist_ok=True)
 for name in files:
-    shutil.copy2(source / name, destination / name)
-print("Saved run artifacts to", destination)
+    shutil.copy2(source / name, TEAM_RUN_DIR / name)
+print("Saved run artifacts to", TEAM_RUN_DIR)
 ```
 
 Keep `best_model.pt` beside its matching `metrics_and_errors.json`. Do not use
 the old Drive checkpoint ID or replace final metrics with a historical run.
 
-## Cell 8 — Open the Sauti demo (optional)
+## Cell 8 — Teammate launcher for the Sauti demo
 
-Run this after the final training cell has completed successfully:
+You run Cell 7 once after training. Give teammates **Viewer** access to the
+shared Drive folder. Each teammate adds its shortcut to My Drive once; after
+that, in each fresh Colab runtime they run this one cell. It updates the app
+code, mounts their authorized Drive, copies only the final checkpoint and
+matching metrics to the temporary runtime, then opens Sauti. They do not train
+the model or copy artifacts themselves. Change `TEAM_RUN_DIR` if the shared
+folder has a different path.
 
 ```python
+from google.colab import drive
+from pathlib import Path
 import os
-os.environ["TRACK_C_MODEL_DIR"] = "/content/track_c_final"
-%run /content/xtenders-nlp-datathon/sauti/colab_demo.py
+import runpy
+import shutil
+import subprocess
+
+REPO_URL = "https://github.com/xtensionlabs/xtenders-nlp-datathon.git"
+REPO = Path("/content/xtenders-nlp-datathon")
+TEAM_RUN_DIR = Path("/content/drive/MyDrive/Team_22_Track_C_Run")
+
+if (REPO / ".git").is_dir():
+    subprocess.run(["git", "-C", str(REPO), "fetch", "origin", "main"], check=True)
+    subprocess.run(["git", "-C", str(REPO), "switch", "main"], check=True)
+    subprocess.run(["git", "-C", str(REPO), "pull", "--ff-only", "origin", "main"], check=True)
+elif REPO.exists():
+    raise RuntimeError(f"{REPO} exists but is not a Git checkout; move it aside manually.")
+else:
+    subprocess.run(
+        ["git", "clone", "--branch", "main", "--single-branch", REPO_URL, str(REPO)],
+        check=True,
+    )
+
+drive.mount("/content/drive")
+saved_model = TEAM_RUN_DIR / "track_c_final"
+for filename in ("best_model.pt", "metrics_and_errors.json"):
+    if not (saved_model / filename).is_file():
+        raise FileNotFoundError(f"Missing {saved_model / filename}; ask the model trainer to run Cell 7.")
+
+local_model = Path("/content/track_c_final")
+local_model.mkdir(parents=True, exist_ok=True)
+for filename in ("best_model.pt", "metrics_and_errors.json"):
+    shutil.copy2(saved_model / filename, local_model / filename)
+
+os.environ["TRACK_C_MODEL_DIR"] = str(local_model)
+os.chdir(REPO)
+runpy.run_path(str(REPO / "sauti" / "colab_demo.py"), run_name="__main__")
 ```
+
+The previous `gdown` ID fetched the historical model. This launcher reads the
+new final model from the team-shared folder instead; it does not make the model
+public or add the weights to GitHub.
