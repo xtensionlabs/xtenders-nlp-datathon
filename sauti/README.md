@@ -1,23 +1,59 @@
-# Sauti · Kiswahili assistant
+# Sauti — Kiswahili semantic parsing demo
 
-Sauti uses the team's AfriBERTa model to interpret a Kiswahili request and explain what it understood.
+Sauti accepts a Kiswahili request and displays a short explanation plus the
+model's predicted JSON frame (`intent` and exact text `slots`). It simulates the
+next action. It does not set alarms, change calendars, fetch weather, or answer
+factual questions. Slot offsets are zero-based Unicode character positions
+with an exclusive `end`.
 
-## Run in Colab
+## Model status
 
-Open [NLP_Project.ipynb](https://colab.research.google.com/drive/1_Zz6qY-MJbF5CKRsMzEESwLqzGEHT9Xo#scrollTo=gng68AWYvVr0) and run **Open the Sauti app**. Colab pulls the current Sauti code and downloads the team's [checkpoint](https://drive.google.com/file/d/1mDaxe4d0g2KACrkVW4vOgnzX01sjXNux/view) as needed. The chat appears below the cell.
+The checkpoint currently in `models/` is historical and uses the earlier
+action labels. The app rejects a checkpoint whose labels do not match all ten
+Track C actions, so it cannot silently present that model as final. The final
+run must use `Team_22_Dataset_Track_C.csv`, with its matching
+`metrics_and_errors.json` beside the checkpoint. See
+[`../docs/model/MODEL_EVALUATION_PROTOCOL.md`](../docs/model/MODEL_EVALUATION_PROTOCOL.md) for the
+split and metric definitions. A valid JSON frame still does not guarantee a
+correct parse.
 
-## Run on Windows
+## Run in Google Colab
 
-From the repository root, run these commands in PowerShell. Use Python 3.11 or newer with PyTorch support.
+Open the team's [Sauti Colab demo](https://colab.research.google.com/drive/1_Zz6qY-MJbF5CKRsMzEESwLqzGEHT9Xo#scrollTo=gng68AWYvVr0) and run **Open the Sauti app** after final training artifacts are available. The helper reads `TRACK_C_MODEL_DIR`; it can download a checkpoint when `TRACK_C_CHECKPOINT_ID` is set. It validates matching metrics and rejects legacy labels or incomplete Track C evaluation. Colab needs internet access for dependencies and the AfriBERTa tokenizer/configuration.
+
+## Run locally on Windows
+
+From the repository root, use Python 3.11 or newer with the model dependencies
+and the PyTorch build that matches your hardware:
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r sauti/requirements.txt
-New-Item -ItemType Directory -Force models
-.\.venv\Scripts\gdown.exe 1mDaxe4d0g2KACrkVW4vOgnzX01sjXNux -O models/joint_model.pt
-.\.venv\Scripts\python.exe sauti/sauti.py --repo . --checkpoint models/joint_model.pt
+.\.venv\Scripts\python.exe -m pip install -r requirements-model.txt
 ```
 
-Open [Sauti on localhost](http://127.0.0.1:8000/) once the server is ready. The first startup fetches AfriBERTa's configuration and tokenizer. The checkpoint stays in the ignored `models/` directory.
+Copy the final Colab output folder, including `best_model.pt` and its matching
+`metrics_and_errors.json`, to `models/track_c_final/`. Keep that metadata with
+the checkpoint; the label order is part of the model weights.
 
-Run the app tests from inside `sauti/` with `python -m unittest discover -s tests`.
+Start the server from the repository root:
+
+```powershell
+.\.venv\Scripts\python.exe sauti/sauti.py --repo . --checkpoint models/track_c_final/best_model.pt
+```
+
+Open <http://127.0.0.1:8000/>. The first start downloads the model's
+configuration and tokenizer from Hugging Face. `models/` and model weight files
+are ignored by Git; arrange judge access to the checkpoint and matching
+metadata, or include a reproducible download location and hashes in the final
+manifest.
+
+## Demo evidence checklist
+
+- Show a request with an intent and several extracted slots.
+- Show a request that has no slot, once one exists in the accepted dataset.
+- Show an unseen slot value and explain that this model can miss new names or
+  expressions.
+- Explain that the displayed frame is a model prediction and may be wrong.
+- Record a 2–3 minute backup video after the final model and data are frozen.
+
+The current repository does not include that backup recording yet.

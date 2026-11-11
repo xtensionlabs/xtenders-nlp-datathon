@@ -1,5 +1,7 @@
 ﻿# Model Weights
 models/
+/results/
+/outputs/
 *.pt
 *.pkl
 *.bin

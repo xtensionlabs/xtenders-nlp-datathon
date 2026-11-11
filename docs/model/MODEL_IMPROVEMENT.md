@@ -1,5 +1,10 @@
 # Track C slot-filling improvement experiment
 
+> **Historical results only:** Every percentage and error below comes from the
+> earlier dataset and split. The current 250-row Track C CSV uses the final
+> action schema and a newly frozen test split. Do not report these historical
+> scores as final Track C performance.
+
 ## Baseline
 
 The T4 baseline used `castorini/afriberta_large`, an intent head, and an
@@ -91,20 +96,25 @@ time span into two, `rec_024` truncated a date and added a spurious item,
 `rec_048` merged a location into a date, `rec_074` overextended an item span,
 and `rec_097` split a two-word location into two location entities.
 
-For the CRF + augmentation comparison, upload the updated `train_joint_intent_slot.py` and
-`Team_22_Dataset_Clean.csv` to Colab and run:
+Those 50 former test records are now in training. A new 50-row test set was
+selected from five former training records per action; see
+`MODEL_EVALUATION_PROTOCOL.md` and
+`../../provenance/track_c_split_reassignment.json`. The model
+must be retrained from the pretrained AfriBERTa weights. Do not resume the old
+joint checkpoint.
 
-```bash
-python -u /content/train_joint_intent_slot.py \
-  --data /content/Team_22_Dataset_Clean.csv \
-  --output-dir /content/joint_afriberta_hybrid \
-  --epochs 8 --batch-size 8 --gradient-accumulation-steps 2 \
-  --seed 42 --precision fp16 --use-crf --augment-slot-values
-```
+Follow [`COLAB_TRACK_C_RUN.md`](COLAB_TRACK_C_RUN.md) for the paste-ready
+Google Colab cells. It runs the baselines, compares three validation-only
+configurations, then trains and evaluates the selected configuration once.
+Do not run the retired typo fine-tuning snippets or resume the historical
+checkpoint.
 
-The checkpoint, comparison metrics/error analysis, and augmentation audit are
-written to `/content/joint_afriberta_hybrid/best_model.pt`,
-`/content/joint_afriberta_hybrid/metrics_and_errors.json`, and
-`/content/joint_afriberta_hybrid/slot_value_augmentation_preview.csv`.
+The training output includes the checkpoint, exact Track C metrics, all test
+predictions, up to five actual errors, tokenizer, label mappings, augmentation
+preview, and a run manifest with data/code/checkpoint hashes and package
+versions. The baseline output contains the separate intent and slot baseline
+metrics and predictions. Do not make further model changes after inspecting
+the new test results and continue to call them final; any such follow-up result
+is exploratory unless a new held-out set is created.
 
 The rejected ablation used a `0.85` layer decay and `5e-5` head learning rate.

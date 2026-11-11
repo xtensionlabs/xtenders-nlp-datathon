@@ -41,6 +41,18 @@ async function requestReply(message, turn) {
     if (pending !== request) return;
     answer.append(label, document.createTextNode(result.reply));
     turn.append(answer);
+    if (result.frame && typeof result.frame === "object") {
+      const frameOutput = document.createElement("section");
+      frameOutput.className = "frame-output";
+      frameOutput.setAttribute("aria-label", "Muundo wa matokeo ya modeli");
+      const caption = document.createElement("p");
+      caption.className = "frame-caption";
+      caption.textContent = "Muundo uliotambuliwa (JSON ya modeli; unaweza kukosea)";
+      const json = document.createElement("pre");
+      json.textContent = JSON.stringify(result.frame, null, 2);
+      frameOutput.append(caption, json);
+      turn.append(frameOutput);
+    }
     if (navigator.clipboard) {
       const copy = document.createElement("button");
       copy.type = "button";

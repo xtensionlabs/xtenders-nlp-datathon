@@ -2,8 +2,8 @@
 """Fine-tune a joint intent and slot model for the Strathmore NLP Datathon.
 
 The CSV's existing ``train``, ``validation`` and ``test`` assignments are
-preserved. Intent labels are read from ``label(intent)`` and slot spans are
-read from ``slots_json``. Slot labels are projected onto whitespace-delimited
+preserved. Intent labels are read from the handbook's ``label`` column (or the
+legacy ``label(intent)`` alias); slot spans are read from ``slots_json``. Slot labels are projected onto whitespace-delimited
 words, then aligned to the first tokenizer sub-token for each word; special
 tokens, padding and remaining sub-tokens receive the cross-entropy ignore
 index (-100).
@@ -14,32 +14,36 @@ model card recommends setting its tokenizer maximum length explicitly, which
 this script does.
 
 Install dependencies (choose the PyTorch build appropriate for your CUDA):
-    pip install torch transformers pandas seqeval
+    pip install -r requirements-model.txt
 
 Example:
     python train_joint_intent_slot.py \
-        --data Team_22_Dataset_Clean.csv \
+        --data Team_22_Dataset_Track_C.csv \
         --output-dir outputs/joint_afriberta \
         --epochs 8 --batch-size 8 --gradient-accumulation-steps 2 \
         --use-crf --augment-slot-values
 
-The default run is the measured V2 model: constrained BIO CRF plus conservative
-training-only slot-value substitutions. Substitutions are restricted to the
-same intent, slot type and word count; original rows are always retained. Use
-``--no-crf --no-slot-value-augmentation`` to reproduce the baseline.
+The default is the historical CRF plus conservative training-only slot-value
+substitution configuration. It is a candidate, not an assumed winner on the
+final split. Compare it with validation-only ablations before the one test run.
+Substitutions use the same intent, slot type and word count; original rows are
+always retained. Use ``--no-crf --no-slot-value-augmentation`` for the
+independent-token, no-augmentation ablation.
 
 The script saves the best validation checkpoint, tokenizer, label mappings,
-test metrics, and a JSON error analysis (up to five misclassified examples).
+Track C metrics and predictions, a run manifest, and up to five actual errors.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
+import importlib.metadata
 import json
 import math
+import platform
 import random
 import re
-import warnings
 from collections import defaultdict
 from contextlib import nullcontext
 from dataclasses import dataclass
@@ -51,7 +55,6 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from seqeval.metrics import f1_score
 from torch.utils.data import DataLoader, Dataset
 from transformers import (
     AutoModel,
@@ -59,10 +62,17 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
+from track_c_evaluation import (
+    bio_tags_to_char_slots,
+    evaluate_track_c,
+    load_track_c_rows,
+    normalize_slot_value,
+    validate_track_c_splits,
+)
+
 
 DEFAULT_MODEL_NAME = "castorini/afriberta_large"
 IGNORE_INDEX = -100
-REQUIRED_COLUMNS = ("text", "label(intent)", "slots_json", "split")
 VALID_SPLITS = ("train", "validation", "test")
 
 
@@ -310,7 +320,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Train and evaluate a joint intent classification/slot filling model."
     )
-    parser.add_argument("--data", type=Path, default=Path("Team_22_Dataset_Clean.csv"))
+    parser.add_argument("--data", type=Path, default=Path("Team_22_Dataset_Track_C.csv"))
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/joint_afriberta"))
     parser.add_argument("--model-name", default=DEFAULT_MODEL_NAME)
     parser.add_argument("--max-length", type=int, default=128)
@@ -362,7 +372,12 @@ def parse_args() -> argparse.Namespace:
         "--expected-intents",
         type=int,
         default=10,
-        help="Warn when the CSV contains a different number of distinct intent labels.",
+        help="Require this many intent labels (the Track C validator requires all ten).",
+    )
+    parser.add_argument(
+        "--validation-only",
+        action="store_true",
+        help="Train/select on train+validation and save validation predictions without evaluating test.",
     )
     parser.add_argument(
         "--no-gradient-checkpointing",
@@ -381,57 +396,8 @@ def set_seed(seed: int) -> None:
 
 
 def load_rows(csv_path: Path) -> dict[str, list[dict[str, Any]]]:
-    """Load rows without changing their supplied split membership or order."""
-    if not csv_path.is_file():
-        raise FileNotFoundError(f"Dataset CSV not found: {csv_path.resolve()}")
-
-    frame = pd.read_csv(csv_path, dtype=str, keep_default_na=False)
-    missing = [column for column in REQUIRED_COLUMNS if column not in frame.columns]
-    if missing:
-        raise ValueError(f"Dataset is missing required columns: {missing}")
-
-    frame = frame.copy()
-    frame["split"] = frame["split"].str.strip().str.lower()
-    unknown_splits = sorted(set(frame["split"]) - set(VALID_SPLITS))
-    if unknown_splits:
-        raise ValueError(
-            f"Found unsupported split values {unknown_splits}; expected only {list(VALID_SPLITS)}."
-        )
-
-    split_rows: dict[str, list[dict[str, Any]]] = {name: [] for name in VALID_SPLITS}
-    for row_index, row in frame.iterrows():
-        text = str(row["text"])
-        intent = str(row["label(intent)"]).strip()
-        split = str(row["split"])
-        if not text.strip():
-            raise ValueError(f"Empty text in CSV row {row_index + 2}.")
-        if not intent:
-            raise ValueError(f"Empty intent label in CSV row {row_index + 2}.")
-
-        raw_slots = row["slots_json"]
-        try:
-            slots = json.loads(raw_slots) if str(raw_slots).strip() else []
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"Invalid slots_json at CSV row {row_index + 2}: {exc}") from exc
-        if not isinstance(slots, list):
-            raise ValueError(f"slots_json must be a JSON array at CSV row {row_index + 2}.")
-        for slot in slots:
-            if not isinstance(slot, dict) or not str(slot.get("type", "")).strip():
-                raise ValueError(f"Malformed slot annotation at CSV row {row_index + 2}: {slot!r}")
-        split_rows[split].append(
-            {
-                "record_id": str(row.get("record_ID", row_index)),
-                "text": text,
-                "intent": intent,
-                "slots": slots,
-                "csv_row": row_index + 2,
-            }
-        )
-
-    empty_splits = [name for name, rows in split_rows.items() if not rows]
-    if empty_splits:
-        raise ValueError(f"The CSV must include non-empty preset splits: {empty_splits}")
-    return split_rows
+    """Load canonical ``label`` or legacy ``label(intent)`` CSVs unchanged."""
+    return load_track_c_rows(csv_path)
 
 
 def whitespace_words(text: str) -> tuple[list[str], list[tuple[int, int]]]:
@@ -717,42 +683,6 @@ def optimizer_parameter_groups(
     ]
 
 
-def decode_entities(tags: list[str], words: list[str]) -> list[dict[str, Any]]:
-    """Decode a BIO sequence into entity type, value and word-span records."""
-    entities: list[dict[str, Any]] = []
-    active_type: Optional[str] = None
-    active_words: list[str] = []
-    start_index: Optional[int] = None
-
-    def close_entity(end_index: int) -> None:
-        nonlocal active_type, active_words, start_index
-        if active_type is not None and start_index is not None:
-            entities.append(
-                {
-                    "type": active_type,
-                    "value": " ".join(active_words),
-                    "word_start": start_index,
-                    "word_end": end_index,
-                }
-            )
-        active_type, active_words, start_index = None, [], None
-
-    for index, tag in enumerate(tags[: len(words)]):
-        if tag == "O":
-            close_entity(index)
-            continue
-        prefix, _, entity_type = tag.partition("-")
-        if prefix == "B" or (prefix == "I" and active_type != entity_type):
-            close_entity(index)
-            active_type, active_words, start_index = entity_type, [words[index]], index
-        elif prefix == "I" and active_type == entity_type:
-            active_words.append(words[index])
-        else:
-            close_entity(index)
-    close_entity(len(tags))
-    return entities
-
-
 @torch.no_grad()
 def evaluate(
     model: JointTransformerModel,
@@ -761,16 +691,14 @@ def evaluate(
     precision_dtype: Optional[torch.dtype],
     intent_labels: list[str],
     slot_labels: list[str],
+    training_slot_values: set[tuple[str, str]],
     collect_errors: bool = False,
 ) -> dict[str, Any]:
     model.eval()
-    correct_intents = 0
-    total_intents = 0
     total_loss = 0.0
     batch_count = 0
-    true_sequences: list[list[str]] = []
-    predicted_sequences: list[list[str]] = []
-    error_records: list[dict[str, Any]] = []
+    gold_records: list[dict[str, Any]] = []
+    predicted_frames: list[dict[str, Any]] = []
 
     for batch in loader:
         input_ids = batch["input_ids"].to(device, non_blocking=True)
@@ -797,67 +725,49 @@ def evaluate(
             else outputs["slot_logits"].argmax(dim=-1).detach().cpu().tolist()
         )
         masks = batch["first_subtoken_mask"].tolist()
-        gold_slot_ids = batch["slot_labels"].tolist()
-        gold_intent_ids = batch["intent_labels"].tolist()
-
-        for example_index, (example, pred_intent_id, mask_row, gold_slot_row, gold_intent_id) in enumerate(zip(
+        for example_index, (example, pred_intent_id, mask_row) in enumerate(zip(
             batch["examples"],
             predicted_intent_ids,
             masks,
-            gold_slot_ids,
-            gold_intent_ids,
         )):
-            total_intents += 1
-            correct_intents += int(pred_intent_id == gold_intent_id)
-            example_gold_tags: list[str] = []
-            example_pred_tags: list[str] = []
+            predicted_tags: list[str] = []
             pred_slot_row = predicted_slot_ids[example_index] if predicted_slot_ids is not None else None
-            for token_index, (is_first, gold_id) in enumerate(zip(mask_row, gold_slot_row)):
-                if is_first and gold_id != IGNORE_INDEX:
-                    example_gold_tags.append(slot_labels[gold_id])
-                    if pred_slot_row is not None:
-                        example_pred_tags.append(slot_labels[pred_slot_row[token_index]])
             if crf_predictions is not None:
-                example_pred_tags = [slot_labels[tag_id] for tag_id in crf_predictions[example_index]]
-            true_sequences.append(example_gold_tags)
-            predicted_sequences.append(example_pred_tags)
+                predicted_tags = [slot_labels[tag_id] for tag_id in crf_predictions[example_index]]
+            elif pred_slot_row is not None:
+                predicted_tags = [
+                    slot_labels[pred_slot_row[token_index]]
+                    for token_index, is_first in enumerate(mask_row)
+                    if is_first
+                ]
 
-            intent_wrong = pred_intent_id != gold_intent_id
-            slots_wrong = example_gold_tags != example_pred_tags
-            if collect_errors and (intent_wrong or slots_wrong) and len(error_records) < 5:
-                visible_words = example.words[: len(example_gold_tags)]
-                error_records.append(
-                    {
-                        "record_ID": example.record_id,
-                        "text": example.text,
-                        "failed_tasks": [
-                            task
-                            for task, failed in (("intent", intent_wrong), ("slots", slots_wrong))
-                            if failed
-                        ],
-                        "expected": {
-                            "intent": intent_labels[gold_intent_id],
-                            "slot_tags": example_gold_tags,
-                            "slots": example.slot_annotations,
-                        },
-                        "predicted": {
-                            "intent": intent_labels[pred_intent_id],
-                            "slot_tags": example_pred_tags,
-                            "slots": decode_entities(example_pred_tags, visible_words),
-                        },
-                    }
-                )
+            gold_records.append(
+                {
+                    "record_id": example.record_id,
+                    "text": example.text,
+                    "intent": intent_labels[example.intent_label],
+                    "slots": example.slot_annotations,
+                }
+            )
+            predicted_frames.append(
+                {
+                    "intent": intent_labels[pred_intent_id],
+                    "slots": bio_tags_to_char_slots(example.text, predicted_tags),
+                }
+            )
 
-    intent_accuracy = correct_intents / total_intents if total_intents else 0.0
-    slot_f1 = float(f1_score(true_sequences, predicted_sequences)) if true_sequences else 0.0
-    return {
-        "loss": total_loss / max(batch_count, 1),
-        "intent_accuracy": intent_accuracy,
-        "slot_f1": slot_f1,
-        "joint_score": (intent_accuracy + slot_f1) / 2.0,
-        "examples": total_intents,
-        "errors": error_records,
-    }
+    scored = evaluate_track_c(
+        gold_records,
+        predicted_frames,
+        training_slot_values=training_slot_values,
+        labels=intent_labels,
+    )
+    scored["loss"] = total_loss / max(batch_count, 1)
+    if not collect_errors:
+        scored.pop("predictions", None)
+        scored.pop("error_analysis", None)
+        scored["unseen_slot_values"].pop("errors", None)
+    return scored
 
 
 def train_one_epoch(
@@ -923,6 +833,77 @@ def save_json(path: Path, content: Any) -> None:
         json.dump(content, file, ensure_ascii=False, indent=2)
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def installed_version(name: str) -> str | None:
+    try:
+        return importlib.metadata.version(name)
+    except importlib.metadata.PackageNotFoundError:
+        return None
+
+
+def save_run_manifest(
+    args: argparse.Namespace,
+    checkpoint_path: Path,
+    split_rows: dict[str, list[dict[str, Any]]],
+    intent_labels: list[str],
+    device: torch.device,
+    test_evaluated: bool,
+) -> None:
+    eval_path = Path(__file__).with_name("track_c_evaluation.py")
+    baseline_path = Path(__file__).with_name("evaluate_track_c_baselines.py")
+    manifest = {
+        "track": "C",
+        "model_name": args.model_name,
+        "seed": args.seed,
+        "dataset_path": str(args.data.resolve()),
+        "dataset_sha256": sha256_file(args.data),
+        "training_script": Path(__file__).name,
+        "training_script_sha256": sha256_file(Path(__file__)),
+        "evaluation_script": eval_path.name,
+        "evaluation_script_sha256": sha256_file(eval_path),
+        "baseline_script": baseline_path.name,
+        "baseline_script_sha256": sha256_file(baseline_path) if baseline_path.is_file() else None,
+        "checkpoint": checkpoint_path.name,
+        "checkpoint_sha256": sha256_file(checkpoint_path),
+        "split_sizes": {name: len(split_rows[name]) for name in VALID_SPLITS},
+        "per_intent_split": {
+            label: {
+                split: sum(row["intent"] == label for row in split_rows[split])
+                for split in VALID_SPLITS
+            }
+            for label in intent_labels
+        },
+        "test_evaluated": test_evaluated,
+        "python_version": platform.python_version(),
+        "device": str(device),
+        "cuda_version": torch.version.cuda,
+        "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
+        "package_versions": {
+            name: installed_version(name)
+            for name in ("torch", "transformers", "pandas", "numpy", "scikit-learn")
+        },
+        "run_arguments": {
+            "epochs": args.epochs,
+            "batch_size": args.batch_size,
+            "gradient_accumulation_steps": args.gradient_accumulation_steps,
+            "learning_rate": args.learning_rate,
+            "max_length": args.max_length,
+            "precision": args.precision,
+            "use_crf": args.use_crf,
+            "augment_slot_values": args.augment_slot_values,
+            "validation_only": args.validation_only,
+        },
+    }
+    save_json(args.output_dir / "run_manifest.json", manifest)
+
+
 def main() -> None:
     args = parse_args()
     if args.epochs < 1 or args.batch_size < 1 or args.gradient_accumulation_steps < 1:
@@ -936,6 +917,7 @@ def main() -> None:
     print(f"Device: {device}; mixed precision: {precision_dtype or 'off'}")
 
     split_rows = load_rows(args.data)
+    validate_track_c_splits(split_rows)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     # Build model output vocabularies from training annotations only. This
     # avoids using validation/test labels to define the classifier schema.
@@ -947,6 +929,11 @@ def main() -> None:
             for slot in row["slots"]
         }
     )
+    training_slot_values = {
+        (str(slot["type"]).strip(), normalize_slot_value(str(slot["value"])))
+        for row in split_rows["train"]
+        for slot in row["slots"]
+    }
     unseen_intents = sorted(
         {
             row["intent"]
@@ -970,10 +957,9 @@ def main() -> None:
             f"intents={unseen_intents}, slot_types={unseen_slot_types}."
         )
     if len(intent_labels) != args.expected_intents:
-        warnings.warn(
-            f"Expected {args.expected_intents} distinct intent labels, but the CSV contains "
-            f"{len(intent_labels)}: {intent_labels}. The classifier will use observed labels only.",
-            stacklevel=1,
+        raise ValueError(
+            f"Expected {args.expected_intents} intent labels, found "
+            f"{len(intent_labels)}: {intent_labels}."
         )
     print("Preset split sizes:", {name: len(split_rows[name]) for name in VALID_SPLITS})
     print(f"Intent labels ({len(intent_labels)}): {intent_labels}")
@@ -1101,7 +1087,7 @@ def main() -> None:
     )
     scaler = torch.amp.GradScaler("cuda", enabled=use_fp16_scaler)
 
-    best_joint_score = -1.0
+    best_selection_key: tuple[float, float, float] | None = None
     best_epoch = 0
     epochs_without_improvement = 0
     checkpoint_path = args.output_dir / "best_model.pt"
@@ -1126,18 +1112,24 @@ def main() -> None:
             precision_dtype,
             intent_labels,
             slot_labels,
+            training_slot_values,
         )
         epoch_record = {
             "epoch": epoch,
             "train_loss": train_loss,
             "skipped_optimizer_steps": skipped_optimizer_steps,
-            "validation": {key: value for key, value in validation_metrics.items() if key != "errors"},
+            "validation": validation_metrics,
         }
         history.append(epoch_record)
         print(json.dumps(epoch_record, ensure_ascii=False))
 
-        if validation_metrics["joint_score"] > best_joint_score:
-            best_joint_score = validation_metrics["joint_score"]
+        selection_key = (
+            float(validation_metrics["full_frame_exact_match"]),
+            float(validation_metrics["intent"]["macro_f1"]),
+            float(validation_metrics["slot_exact_type_character_span_micro"]["f1"]),
+        )
+        if best_selection_key is None or selection_key > best_selection_key:
+            best_selection_key = selection_key
             best_epoch = epoch
             epochs_without_improvement = 0
             torch.save(model.state_dict(), checkpoint_path)
@@ -1151,6 +1143,32 @@ def main() -> None:
         raise RuntimeError("Training ended without producing a best validation checkpoint.")
     model.load_state_dict(torch.load(checkpoint_path, map_location=device, weights_only=True))
 
+    best_validation_metrics = evaluate(
+        model,
+        validation_loader,
+        device,
+        precision_dtype,
+        intent_labels,
+        slot_labels,
+        training_slot_values,
+        collect_errors=True,
+    )
+    validation_report = {
+        key: value for key, value in best_validation_metrics.items() if key != "predictions"
+    }
+    validation_report["best_epoch"] = best_epoch
+    validation_report["selection_key"] = list(best_selection_key or ())
+    validation_report["examples"] = len(best_validation_metrics["predictions"])
+    save_json(args.output_dir / "validation_metrics.json", validation_report)
+    save_json(args.output_dir / "validation_predictions.json", best_validation_metrics["predictions"])
+
+    if args.validation_only:
+        save_run_manifest(args, checkpoint_path, split_rows, intent_labels, device, test_evaluated=False)
+        print("Validation-only run complete. Test examples were not evaluated.")
+        print(json.dumps(validation_report, ensure_ascii=False, indent=2))
+        print(f"\nBest validation checkpoint: {checkpoint_path.resolve()}")
+        return
+
     test_metrics = evaluate(
         model,
         test_loader,
@@ -1158,8 +1176,19 @@ def main() -> None:
         precision_dtype,
         intent_labels,
         slot_labels,
+        training_slot_values,
         collect_errors=True,
     )
+    test_report = {
+        "intent": test_metrics["intent"],
+        "slot_exact_type_character_span_micro": test_metrics["slot_exact_type_character_span_micro"],
+        "full_frame_exact_match": test_metrics["full_frame_exact_match"],
+        "full_frame_exact_count": test_metrics["full_frame_exact_count"],
+        "json_validity": test_metrics["json_validity"],
+        "unseen_slot_values": test_metrics["unseen_slot_values"],
+        "loss": test_metrics["loss"],
+        "examples": len(test_metrics["predictions"]),
+    }
     result = {
         "model_name": args.model_name,
         "slot_decoder": "constrained_linear_chain_crf" if args.use_crf else "token_softmax",
@@ -1175,18 +1204,28 @@ def main() -> None:
         },
         "seed": args.seed,
         "best_epoch": best_epoch,
-        "best_validation_joint_score": best_joint_score,
+        "checkpoint_selection": {
+            "split": "validation",
+            "priority": [
+                "full_frame_exact_match",
+                "intent_macro_f1",
+                "exact_type_character_span_slot_f1",
+            ],
+            "best_validation_key": list(best_selection_key or ()),
+        },
+        "best_validation": validation_report,
         "split_sizes": {name: len(split_rows[name]) for name in VALID_SPLITS},
+        "per_intent_split": {
+            label: {
+                split: sum(row["intent"] == label for row in split_rows[split])
+                for split in VALID_SPLITS
+            }
+            for label in intent_labels
+        },
         "intent_labels": intent_labels,
         "slot_labels": slot_labels,
-        "test": {
-            "intent_accuracy": test_metrics["intent_accuracy"],
-            "slot_f1_seqeval": test_metrics["slot_f1"],
-            "joint_score": test_metrics["joint_score"],
-            "loss": test_metrics["loss"],
-            "examples": test_metrics["examples"],
-        },
-        "error_analysis": test_metrics["errors"],
+        "test": test_report,
+        "error_analysis": test_metrics["error_analysis"],
         "training_history": history,
     }
 
@@ -1197,7 +1236,9 @@ def main() -> None:
         "slot_label_to_id": slot_label_to_id,
         "slot_type_to_id": slot_type_to_id,
     })
+    save_json(args.output_dir / "test_predictions.json", test_metrics["predictions"])
     save_json(args.output_dir / "metrics_and_errors.json", result)
+    save_run_manifest(args, checkpoint_path, split_rows, intent_labels, device, test_evaluated=True)
     print("\nTest metrics and error analysis:")
     print(json.dumps({key: value for key, value in result.items() if key != "training_history"}, ensure_ascii=False, indent=2))
     print(f"\nBest checkpoint: {checkpoint_path.resolve()}")

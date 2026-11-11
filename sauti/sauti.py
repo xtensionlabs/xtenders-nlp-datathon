@@ -64,12 +64,13 @@ def handler_for(respond):
                 return
             try:
                 with inference_lock:
-                    reply = respond(message.strip())
+                    result = respond(message.strip())
             except Exception:
                 logging.exception("Sauti inference failed")
                 self.send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "Jibu halipatikani kwa sasa. Jaribu tena."})
                 return
-            self.send_json(HTTPStatus.OK, {"reply": reply})
+            payload = result if isinstance(result, dict) else {"reply": result}
+            self.send_json(HTTPStatus.OK, payload)
 
     return Handler
 

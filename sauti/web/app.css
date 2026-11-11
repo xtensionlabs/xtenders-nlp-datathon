@@ -45,6 +45,9 @@ h2{display:flex;gap:9px;align-items:center;font-size:.9rem;margin:0 0 16px;borde
 .question{justify-self:end;background:var(--action);color:white;border-radius:18px 18px 4px 18px}
 .answer{justify-self:start;background:var(--surface);border:1px solid var(--line);border-radius:4px 18px 18px 18px}
 .answer strong{display:block;color:var(--accent);font-size:.76rem;margin-bottom:3px}
+.frame-output{justify-self:start;width:min(100%,560px);overflow:hidden;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.frame-caption{margin:0;padding:9px 12px;border-bottom:1px solid var(--line);color:var(--muted);font-size:.76rem}
+.frame-output pre{margin:0;padding:12px;overflow:auto;color:var(--text);font: .78rem/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
 .retry{justify-self:start}
 .copy-reply{justify-self:start;min-height:44px;padding:4px 10px;border:0;border-radius:10px;background:transparent;color:var(--accent);font-size:.8rem}
 .copy-reply:hover{background:var(--soft)}

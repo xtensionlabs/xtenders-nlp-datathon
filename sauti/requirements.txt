@@ -1,6 +1,4 @@
 torch>=2.6,<3
 transformers==5.3.0
 sentencepiece>=0.2,<0.3
-seqeval==1.2.2
 pandas>=2.2,<4
-gdown>=5,<7
