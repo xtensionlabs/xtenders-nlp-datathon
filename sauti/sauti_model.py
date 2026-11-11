@@ -1,8 +1,11 @@
 """Load the datathon checkpoint and format Kiswahili replies and semantic frames."""
 
+from datetime import datetime, timedelta
 from importlib.util import module_from_spec, spec_from_file_location
 import json
+import re
 import sys
+from zoneinfo import ZoneInfo
 
 
 TRACK_C_INTENTS = {
@@ -38,13 +41,104 @@ INTENTS = {
 }
 SLOTS = {"date": "Tarehe", "time": "Muda", "location": "Mahali", "item": "Kipengee", "term": "Mada"}
 
+SPELLING = {
+    "kehso": "kesho",
+    "keshho": "kesho",
+    "kenglee": "kengele",
+    "kenegle": "kengele",
+    "mkutnao": "mkutano",
+}
+INTENT_CUES = {"kengele": "alarm_set", "mkutano": "calendar_set"}
+CALENDAR_CHOICES = {"calendar_query": "Angalia ratiba", "calendar_set": "Ongeza tukio"}
+# Conservative cutoffs for this checkpoint's uncalibrated softmax scores.
+CLARIFICATION_MAX_SCORE = 0.30
+CLARIFICATION_MAX_GAP = 0.08
+CLARIFICATION_MIN_PAIR_SCORE = 0.45
+RELATIVE_DAYS = {"juzi": -2, "jana": -1, "leo": 0, "kesho": 1, "kesho kutwa": 2}
+MONTHS = (
+    "Januari", "Februari", "Machi", "Aprili", "Mei", "Juni",
+    "Julai", "Agosti", "Septemba", "Oktoba", "Novemba", "Desemba",
+)
 
-def format_reply(intent, entities):
+
+def normalize_words(words):
+    normalized = []
+    for word in words:
+        match = re.fullmatch(r"([^\w]*)([a-zA-Z]+)([^\w]*)", word)
+        if not match or (corrected := SPELLING.get(match[2].lower())) is None:
+            normalized.append(word)
+            continue
+        if match[2].isupper():
+            corrected = corrected.upper()
+        elif match[2][0].isupper():
+            corrected = corrected.capitalize()
+        normalized.append(match[1] + corrected + match[3])
+    return normalized
+
+
+def format_reply(intent, entities, *, today=None):
     action = INTENTS.get(intent)
     if action is None:
         return "Sijaelewa ombi hilo. Jaribu kuliandika kwa maneno mengine."
-    details = [f"{SLOTS[entity['type']]}: {entity['value']}" for entity in entities if entity["type"] in SLOTS]
+    details = []
+    for entity in entities:
+        kind, value = entity["type"], entity["value"]
+        if kind not in SLOTS:
+            continue
+        if kind in {"date", "time"}:
+            phrase = " ".join(normalize_words(value.casefold().split()))
+            phrase = re.sub(r"^\W+|\W+$", "", phrase)
+            offset = RELATIVE_DAYS.get(phrase)
+            if offset is not None:
+                if today is None:
+                    today = datetime.now(ZoneInfo("Africa/Nairobi")).date()
+                date = today + timedelta(days=offset)
+                details.append(f"Tarehe: {date.day} {MONTHS[date.month - 1]} {date.year} ({phrase})")
+                continue
+        details.append(f"{SLOTS[kind]}: {value}")
     return "\n".join([f"Nimeelewa kuwa unataka {action}.", *details])
+
+
+def interpret_prediction(ranked, entities, words, corrected):
+    """Return a reply, or offer choices when the scores give little guidance."""
+    (intent, score), (alternative, runner_up) = ranked
+    if score < CLARIFICATION_MAX_SCORE and score - runner_up < CLARIFICATION_MAX_GAP:
+        if score + runner_up < CLARIFICATION_MIN_PAIR_SCORE:
+            return {"reply": "Sijaelewa ombi lako vizuri. Unaweza kuliandika kwa maneno mengine?"}
+        if {intent, alternative} == CALENDAR_CHOICES.keys():
+            question = "Unataka kuona ratiba yako au kuongeza tukio?"
+        else:
+            question = "Sijaelewa ombi lako vizuri. Unataka kufanya nini?"
+        return {
+            "reply": question,
+            "choices": [
+                {"label": CALENDAR_CHOICES.get(choice, INTENTS[choice].capitalize()),
+                 "reply": explain_prediction(choice, entities, words, corrected),
+                 "frame": {"intent": choice, "slots": entities}}
+                for choice in (intent, alternative)
+            ],
+        }
+    return {
+        "reply": explain_prediction(intent, entities, words, corrected),
+        "frame": {"intent": intent, "slots": entities},
+    }
+
+
+def explain_prediction(intent, entities, words, corrected):
+    notes = []
+    for (original, (start, end)), replacement in zip(words, corrected):
+        clean = re.sub(r"^\W+|\W+$", "", replacement).casefold()
+        if original == replacement:
+            continue
+        relevant = any(
+            slot["type"] in {"date", "time"} and slot["start"] < end and start < slot["end"]
+            for slot in entities
+        )
+        if relevant or INTENT_CUES.get(clean) == intent:
+            note = f"Nimesoma ‘{original}’ kama ‘{replacement}’."
+            if note not in notes:
+                notes.append(note)
+    return "\n".join([format_reply(intent, entities), *notes])
 
 
 def load_responder(repository, checkpoint):
@@ -120,9 +214,10 @@ def load_responder(repository, checkpoint):
 
     @torch.inference_mode()
     def respond(text):
-        words, _ = training.whitespace_words(text)
+        words, spans = training.whitespace_words(text)
+        corrected = normalize_words(words)
         encoded = tokenizer(
-            words, is_split_into_words=True, truncation=True, max_length=128,
+            corrected, is_split_into_words=True, truncation=True, max_length=128,
             return_tensors="pt",
         )
         word_ids = encoded.word_ids()
@@ -137,15 +232,16 @@ def load_responder(repository, checkpoint):
             encoded["input_ids"].to(device), encoded["attention_mask"].to(device),
             first_subtoken_mask=mask, decode_slots=True,
         )
-        intent = intent_labels[result["intent_logits"][0].argmax().item()]
+        scores, indices = result["intent_logits"][0].softmax(dim=-1).topk(2)
+        ranked = [(intent_labels[index], score) for index, score in zip(indices.tolist(), scores.tolist())]
         predictions = result["slot_predictions"]
         ids = (predictions[0] if predictions is not None
                else result["slot_logits"][mask].argmax(dim=-1).tolist())
         tags = [slot_labels[index] for index in ids]
         slots = training.bio_tags_to_char_slots(text, tags)
-        return {
-            "reply": format_reply(intent, slots),
-            "frame": {"intent": intent, "slots": slots},
-        }
+        visible = [word_id for word_id, include in zip(word_ids, first) if include]
+        return interpret_prediction(
+            ranked, slots, [(words[i], spans[i]) for i in visible], [corrected[i] for i in visible],
+        )
 
     return respond
