@@ -33,7 +33,8 @@ location and kesho, ‘tomorrow’, as the date. The JSON shows where those valu
 appear in the original sentence. This demo parses the request; it does not
 fetch a forecast.”
 
-Keep the response and JSON visible while speaking.
+Keep the response and JSON visible while speaking. If the JSON section is
+collapsed in the deployed build, select **Maelezo ya modeli** to expand it.
 
 ### 0:55–1:35 | Calendar query
 

@@ -35,6 +35,7 @@ function showReply(turn, answer, label, {reply, frame}) {
   if (frame) {
     const details = document.createElement("details");
     details.className = "frame-output";
+    details.open = true;
     const summary = document.createElement("summary");
     summary.textContent = "Maelezo ya modeli";
     const data = document.createElement("pre");
