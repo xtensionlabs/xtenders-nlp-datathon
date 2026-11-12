@@ -84,9 +84,11 @@ needed for the parse:
 ## Current dataset
 
 `Team_22_Dataset_Track_C.csv` is the single authoritative dataset and follows
-this guide. All 250 rows are reviewer-approved per the team's confirmation.
-Accepted corrections map `take_note` to `lists_createoradd` and `general_qa`
-to `qa_definition`, with original labels and reviewer evidence retained in
-  `../../provenance/track_c_label_correction_log.csv`. The dataset has slot-free test coverage
-and balanced splits. Use `audit_track_c.py` to check its structure. See
-[`TRACK_C_READINESS.md`](../model/TRACK_C_READINESS.md).
+this guide. An independent Kiswahili reviewer approved all 250 rows. Accepted
+corrections map `take_note` to `lists_createoradd` and `general_qa` to
+`qa_definition`; original labels, accepted labels, reasons, and reviewer codes
+are recorded in `../../provenance/track_c_label_correction_log.csv`. The
+dataset includes slot-free test coverage and balanced splits. Use
+`audit_track_c.py` to check its structure. See the
+[quality report](quality_report.md) and
+[Track C evidence summary](../model/TRACK_C_EVIDENCE.md).

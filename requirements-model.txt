@@ -5,3 +5,4 @@ sentencepiece>=0.2,<0.3
 pandas>=2.2,<4
 numpy>=1.26,<3
 scikit-learn>=1.5,<2
+tzdata>=2025.2

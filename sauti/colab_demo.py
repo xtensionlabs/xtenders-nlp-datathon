@@ -44,7 +44,7 @@ def open_demo():
     from google.colab import output
     from IPython.display import HTML, JSON, display
 
-    dependencies = ("transformers", "sentencepiece")
+    dependencies = ("transformers", "sentencepiece", "tzdata")
     missing = [package for package in dependencies if find_spec(package) is None]
     if missing:
         subprocess.run([sys.executable, "-m", "pip", "install", "-q", *missing], check=True)

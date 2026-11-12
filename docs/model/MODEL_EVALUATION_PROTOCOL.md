@@ -13,20 +13,18 @@ intent. The row-level split changes are recorded in
 `../../provenance/Team_22_Source_Log.csv` was updated to
 match.
 
-The new test records were not evaluated in the previous experiment. The old
-checkpoint had included them in its training set, so the final run must start
-from the pretrained AfriBERTa model and train only on the new `train` split; do
-not resume the old joint checkpoint. This is a fresh holdout for the final
-training run, with a small-data limitation: these are not newly collected
-utterances. A completely prospective test would require additional reviewed
-records.
+The new test records were not evaluated in the previous experiment. The
+retired checkpoint had included them in training, so the final run started from
+pretrained AfriBERTa and used only the current `train` split. This is a fresh
+holdout for this run, with a small-data limitation: the records were not newly
+collected utterances. A completely prospective test would require additional
+reviewed records.
 
-From this point forward, use `validation` to select the model configuration and
-checkpoint. `--validation-only` saves validation metrics and predictions
-without evaluating test. Run the final `test` evaluation once after code, data,
-and settings are frozen.
-If test errors lead to another model change, label the resulting test score
-exploratory and reserve a new holdout for a final estimate.
+Validation is the model-selection split. The `--validation-only` option saves
+validation metrics and predictions without evaluating test; the final test
+evaluation was run once after code, data, and settings were frozen. Test results
+were used only for reporting. A model change based on these errors would make a
+later score exploratory unless a new holdout were reserved.
 
 ## Required measurements
 
@@ -76,6 +74,38 @@ The fixed test contains five examples per action. Treat these as prototype
 estimates, report the per-action counts and errors, and avoid presenting them
 as broad claims about Kiswahili performance.
 
+## Final Colab result
+
+The final run used `castorini/afriberta_large`, seed 42, and selected epoch 8.
+On the frozen 50-row test set it scored 1.0000 intent accuracy and macro-F1,
+0.8533 exact-slot precision, 0.7356 recall, 0.7901 F1, 0.5800 full-frame exact
+match, 1.0000 JSON/schema validity, and 0.5833 unseen-value exact recall. The
+test dataset SHA-256 was
+`0756d1b54581bd23eab36a0455e987e3ca6d45d51f61ab5f544d146058509193`.
+
+The public submission dataset uses the same requests, labels, slots, review
+statuses, and splits. Its permission reference is an opaque private record ID
+(`T22-PERM-2026-11-11`), and its adjudication notes use concise judge-facing
+wording. Its SHA-256 is
+`0e10c800925e101af08aee1213f55543dcc508a024da918d6c87d3a96703835f`. These
+metadata-only edits protect permission evidence and do not alter model inputs.
+
+The model exceeds the strongest train-only baseline by 14 percentage points
+in intent accuracy, 22.49 points in exact-slot F1, and 34 points in full-frame
+exact match. The test has only five examples per action and was selected from
+former training rows, not newly collected utterances. Report the scores with
+that limitation, the per-record predictions, and up to five actual errors.
+
+The recorded test error analysis contains five full-frame mistakes:
+
+| Record | Gold frame detail | Model error |
+| --- | --- | --- |
+| `rec_028` | Calendar query with item `shughuli` and date `wiki hii`. | Correct intent and date; missed the item. |
+| `rec_055` | Calendar set with item `sherehe ya kuzaliwa`, date, and time. | Correct intent, date, and time; missed the item. |
+| `rec_083` | Date/time query with time `Saa 07:45`. | Correct intent and time; added a false `location` span for `Kiswahili`. |
+| `rec_106` | Definition query with term `afya bora`. | Correct intent; returned only `afya` as the term. |
+| `rec_153` | News query with terms `Gor Mahia` and `mechi yao ya kirafiki`. | Correct intent and first term; missed the second term. |
+
 ## Colab run
 
 Use the cell-by-cell instructions in [`COLAB_TRACK_C_RUN.md`](COLAB_TRACK_C_RUN.md).
@@ -83,14 +113,13 @@ They clone or fast-forward `main`, stop if the current Track C files are missing
 run train-only baselines and three validation-only ablations, select one
 configuration without test metrics, then run the final test comparison once.
 
-Keep the complete `/content/track_c_final` folder with the checkpoint,
+The complete `/content/track_c_final` run folder contains the checkpoint,
 `metrics_and_errors.json`, `test_predictions.json`, `label_mappings.json`,
 `validation_metrics.json`, `validation_predictions.json`, `run_manifest.json`,
-and tokenizer. The manifest records data/code/checkpoint
-hashes, package versions, split sizes, and run settings. Keep the baseline
-output folder, all three validation-only candidate folders, and
-`validation_model_selection.md` too. Do not replace the old historical metrics with new values
-until the run has completed successfully.
+and tokenizer. The manifest records data/code/checkpoint hashes, package
+versions, split sizes, and run settings. The Colab artifact-backup cell also
+copies the baseline output folder, three validation-only candidate folders,
+and `validation_model_selection.md`.
 
 Choose among the three variants using validation full-frame exact match,
 breaking ties by intent macro-F1 and exact-span slot F1. If softmax/no

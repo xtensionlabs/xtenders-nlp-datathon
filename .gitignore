@@ -1,5 +1,7 @@
 ﻿# Model Weights
 models/
+/private_submission_materials/
+/submission_package/
 /results/
 /outputs/
 *.pt

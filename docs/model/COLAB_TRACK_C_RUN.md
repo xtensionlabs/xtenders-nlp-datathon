@@ -1,9 +1,7 @@
-# Track C Colab training cells
+# Track C Colab workflow
 
-Use these cells for the final Track C model run. They replace the older typo
-fine-tuning cells. Do not download the old `joint_model.pt`, use
-`Team_22_Dataset_Clean.csv`, or delete Colab's `/content/.config`; those steps
-belong to the retired experiment.
+Use these cells to reproduce Track C validation, final training, evaluation,
+artifact backup, and the Sauti demo.
 
 ## Cell 1 — Clone or update the project
 
@@ -43,7 +41,7 @@ missing = [name for name in required if not (REPO / name).is_file()]
 if missing:
     raise RuntimeError(
         "GitHub main is missing the current Track C files: " + ", ".join(missing)
-        + ". Publish the reviewed local Track C changes to GitHub, then rerun this cell."
+        + ". Use the project revision that contains the Track C submission files."
     )
 
 print("Repository:", REPO)
@@ -174,11 +172,9 @@ cat /content/track_c_comparison.md
 
 ## Cell 7 — Keep the run artifacts in Google Drive
 
-This preserves the final checkpoint and the evidence needed to reproduce and
-review the result after `/content` is cleared. Put this folder in a **Team
-shared folder or Shared Drive** and grant access to every teammate. A folder in
-your personal `MyDrive` is only persistent for accounts that can access it.
-For a Shared Drive, change `TEAM_RUN_DIR` to
+This preserves the final checkpoint and evidence after `/content` is cleared.
+For access from another Google account, put the folder in a shared folder or
+Shared Drive and grant that account access. For a Shared Drive, change `TEAM_RUN_DIR` to
 `/content/drive/Shareddrives/<shared-drive-name>/Team_22_Track_C_Run`. For a
 folder shared with you, add a shortcut to `MyDrive` and use that mounted path.
 The validation folders contain checkpoints and can take substantial Drive
@@ -206,8 +202,8 @@ for name in files:
 print("Saved run artifacts to", TEAM_RUN_DIR)
 ```
 
-Keep `best_model.pt` beside its matching `metrics_and_errors.json`. Do not use
-the old Drive checkpoint ID or replace final metrics with a historical run.
+Keep `best_model.pt` beside its matching `metrics_and_errors.json`; the label
+order and evaluation metadata are part of the reproducible model artifact.
 
 ## Cell 8 — Open the Sauti interface after training
 
@@ -230,15 +226,14 @@ os.environ["TRACK_C_MODEL_DIR"] = str(MODEL_DIR)
 _ = runpy.run_path(str(REPO / "sauti" / "colab_demo.py"), run_name="__main__")
 ```
 
-## Cell 9 — Teammate launcher for the Sauti demo
+## Cell 9 — Open Sauti in a fresh runtime
 
-You run Cell 7 once after training. Give teammates **Viewer** access to the
-shared Drive folder. Each teammate adds its shortcut to My Drive once; after
-that, in each fresh Colab runtime they run this one cell. It updates the app
-code, mounts their authorized Drive, copies only the final checkpoint and
-matching metrics to the temporary runtime, then opens Sauti. They do not train
-the model or copy artifacts themselves. Change `TEAM_RUN_DIR` if the shared
-folder has a different path.
+Cell 7 saves the run folder in a shared Google Drive location. Any Google
+account with access to that folder can run this cell in a fresh Colab runtime.
+The launcher updates the app code, mounts Drive, copies the final checkpoint
+and matching metadata into temporary runtime storage, then opens Sauti. It
+does not retrain the model. Set `TEAM_RUN_DIR` to the shared folder's mounted
+path if it differs from the example path.
 
 ```python
 from google.colab import drive
@@ -268,7 +263,9 @@ drive.mount("/content/drive")
 saved_model = TEAM_RUN_DIR / "track_c_final"
 for filename in ("best_model.pt", "metrics_and_errors.json"):
     if not (saved_model / filename).is_file():
-        raise FileNotFoundError(f"Missing {saved_model / filename}; ask the model trainer to run Cell 7.")
+        raise FileNotFoundError(
+            f"Missing {saved_model / filename}; complete the final training and artifact-backup cells first."
+        )
 
 local_model = Path("/content/track_c_final")
 local_model.mkdir(parents=True, exist_ok=True)
@@ -280,6 +277,5 @@ os.chdir(REPO)
 _ = runpy.run_path(str(REPO / "sauti" / "colab_demo.py"), run_name="__main__")
 ```
 
-The previous `gdown` ID fetched the historical model. This launcher reads the
-new final model from the team-shared folder instead; it does not make the model
-public or add the weights to GitHub.
+The launcher reads only the final checkpoint and its matching metadata from
+the shared run folder. The large checkpoint remains outside GitHub.

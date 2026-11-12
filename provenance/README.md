@@ -1,16 +1,19 @@
-# Provenance records
+# Dataset provenance
 
-These files document the dataset's sources, accepted annotation changes,
-review evidence, and reproducible split reassignment. They are supporting
-records; `../Team_22_Dataset_Track_C.csv` is the repository's only dataset.
+These records accompany `Team_22_Dataset_Track_C.csv`; they are not
+additional datasets.
 
-- `Team_22_Source_Log.csv`: one provenance and review record per dataset row.
-- `track_c_label_correction_log.csv`: original and accepted labels for the 50
-  corrected examples.
-- `track_c_split_reassignment.json`: deterministic row movement for the
-  refreshed 15/5/5 split.
-- `source_log_template.csv`: blank template for recording future additions.
+- `Team_22_Source_Log.csv`: one source, review, permission-reference, and split
+  record per example.
+- `track_c_label_correction_log.csv`: the original and accepted labels,
+  reasons, and reviewer codes for 50 corrections.
+- `track_c_split_reassignment.json`: deterministic assignment of the current
+  15/5/5 splits.
 
-The permission evidence referenced by each row is in
-[`../docs/team/permission_and_release_record.md`](../docs/team/permission_and_release_record.md).
-Keep private identity mappings and consent records outside the repository.
+Contributor and reviewer values are pseudonymous codes. Permission references
+identify records held outside the public submission; the audit checks their
+presence and format but cannot determine legal scope.
+
+Where the original reviewer date was not recorded, `review_date` retains the
+value `not_recorded`; the adjudication note records when approval was confirmed
+for the public provenance log.

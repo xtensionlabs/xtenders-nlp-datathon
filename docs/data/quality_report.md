@@ -1,11 +1,11 @@
 # Dataset quality report: Team 22, Track C
 
-**Audit date:** 11 November 2026  
+**Audit date:** 12 November 2026
 **Audited file:** `Team_22_Dataset_Track_C.csv`  
 **Method:** structural checks via `audit_track_c.py`, row-level label
-inspection, and the team's confirmation that an independent Kiswahili reviewer
-approved all 250 records, including the accepted label corrections. Every row
-records `independently_reviewed`.
+inspection, and the recorded independent Kiswahili reviewer approval for all
+250 records, including the accepted label corrections. Every row records
+`independently_reviewed`.
 
 ## Results
 
@@ -17,7 +17,7 @@ records `independently_reviewed`.
   reasons, and reviewer codes are in `../../provenance/track_c_label_correction_log.csv`.
 - **Human contribution and review:** 224 inherited team-authored rows plus 26
   additional team-authored requests are included. All 250 are marked
-  independently reviewed per the team's confirmation. Twenty-six
+  independently reviewed. Twenty-six
   programmatic-padding records from older drafts are excluded.
 - **Slot coverage:** 475 annotations; 239/250 rows are slot-bearing. Test has
   48 slot-bearing and 2 slot-free rows; train has 144 and 6; validation has
@@ -53,16 +53,20 @@ records `independently_reviewed`.
   new test; former test rows moved to training. This preserves 15/5/5 and is
   recorded in `../../provenance/track_c_split_reassignment.json`.
 - **Provenance:** `../../provenance/Team_22_Source_Log.csv` links every row to
-  `../team/permission_and_release_record.md`. Team 22 permission is documented for
+  private permission record `T22-PERM-2026-11-11`. Team 22 authorized use for
   submission, judging, evaluation, and demonstration. The scope excludes open
   redistribution and reuse outside this project; no open license is claimed.
 
 ## Disposition
 
-The data-quality, contribution-coverage, and provenance requirements for the
-declared Datathon use are documented. The dataset is not licensed for open
-redistribution. The current neural checkpoint predates the final action labels
-and revised test split; it must not be reported as a final result.
+The audit confirms 250 unique records, balanced Track C labels and splits, 475
+structurally valid slots, independent-review status recorded on every row, and
+row-level source references. The final AfriBERTa run used this dataset and
+scored 100.00% intent accuracy, 79.01% exact-span slot F1, 58.00% full-frame
+exact match, 100.00% JSON validity, and 58.33% unseen-value exact recall on the
+50-row test set. The test has five examples per action; these results describe
+this split and are not a broad Kiswahili performance estimate. Permission
+covers the Datathon submission and assessment, not open redistribution.
 
 Run the structural audit with:
 
@@ -70,4 +74,5 @@ Run the structural audit with:
 .\.venv\Scripts\python.exe audit_track_c.py Team_22_Dataset_Track_C.csv
 ```
 
-See `../model/TRACK_C_READINESS.md` for the rubric mapping and next steps.
+See `../model/MODEL_EVALUATION_PROTOCOL.md` for metric definitions, baseline
+comparison, and actual test errors.

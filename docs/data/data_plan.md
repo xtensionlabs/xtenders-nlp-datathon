@@ -4,8 +4,7 @@
 
 - **Team:** 22, Kiswahili 3
 - **Track:** C, limited semantic parsing
-- **Language:** Kiswahili, reviewed by the team's independent Kiswahili
-  reviewer.
+- **Language:** Kiswahili, reviewed by an independent Kiswahili reviewer.
 - **Output:** one exact handbook action label plus zero or more text spans of
   type `location`, `date`, `time`, `item`, or `term`.
 
@@ -17,11 +16,11 @@
 corrections, and 26 additional team-authored requests. Twenty-six
 programmatic-padding records from older drafts are excluded.
 
-The team confirms that the independent reviewer approved all 250 records,
-including language, labels, slots, and grouping. Every row is marked
-`independently_reviewed`. The new requests use contributor code `T22-AUTH-01`
-and reviewer code `T22-R1`; inherited rows retain source reviewer code
-`member_A`.
+An independent Kiswahili reviewer approved all 250 records, including
+language, labels, slots, and grouping. Every row is marked
+`independently_reviewed`. The additional requests use contributor code
+`T22-AUTH-01` and reviewer code `T22-R1`; inherited rows retain source
+reviewer code `member_A`.
 
 ## Annotation and split plan
 
@@ -47,13 +46,18 @@ references, contributor/reviewer codes, review statuses, splits, and label
 corrections for all 250 rows. `../../provenance/track_c_label_correction_log.csv` preserves
 original and accepted labels for the 50 corrected records.
 
-`../team/permission_and_release_record.md` documents Team 22's permission for
-submission, judging, evaluation, and demonstration. This secures the declared
-Datathon use. It does not grant open redistribution, commercial use, or reuse
-outside this project. Keep identity mappings private and do not claim CC0 or
-another open license.
+Team 22 authorized use for this Datathon submission, judging, evaluation, and
+demonstration. This does not grant open redistribution, commercial use, or
+reuse outside this project. The source log references private permission
+record `T22-PERM-2026-11-11`; supporting evidence and identity mappings are
+retained outside the public submission. No open license is claimed.
 
-The existing model artifacts predate this final dataset; the next model run
-should use `Team_22_Dataset_Track_C.csv`. See `../model/TRACK_C_READINESS.md`,
-`quality_report.md`, `../../provenance/Team_22_Source_Log.csv`, and
-`../team/permission_and_release_record.md` for the rubric audit and provenance scope.
+The final AfriBERTa model used the requests, labels, slots, and splits in
+`Team_22_Dataset_Track_C.csv`. The public CSV uses an opaque permission-record
+ID and concise, judge-facing adjudication notes instead of a path to private
+evidence and an internal confirmation note. These metadata edits did not change
+model inputs. The model's
+frozen-test results, train-only baseline comparison, and error analysis are in
+`../model/MODEL_EVALUATION_PROTOCOL.md`. See `quality_report.md` and
+`../../provenance/Team_22_Source_Log.csv` for the structural audit and
+row-level provenance.

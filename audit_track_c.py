@@ -132,6 +132,7 @@ def audit(path: Path) -> dict:
     review_statuses = Counter(value(row, "review_status") for row in rows)
     permissions = Counter(value(row, "permission") or "<blank>" for row in rows)
     source_ids_not_applicable = 0
+    private_permission_refs = Counter()
     contributor_reviewer_same = 0
     slot_records = Counter()
     slot_total = 0
@@ -161,6 +162,12 @@ def audit(path: Path) -> dict:
         permission_ref = value(row, "permission_evidence")
         if not permission_ref:
             evidence_issues.append(f"CSV row {index}: missing permission_evidence_ref")
+        elif permission_ref.startswith("private:"):
+            private_id = permission_ref.removeprefix("private:").strip()
+            if not private_id:
+                evidence_issues.append(f"CSV row {index}: empty private permission record ID")
+            else:
+                private_permission_refs[private_id] += 1
         elif not (path.parent / permission_ref.split("#", 1)[0]).is_file():
             evidence_issues.append(
                 f"CSV row {index}: permission_evidence_ref target does not exist: {permission_ref!r}"
@@ -237,6 +244,7 @@ def audit(path: Path) -> dict:
         "review_statuses": dict(sorted(review_statuses.items())),
         "permission_values": dict(sorted(permissions.items())),
         "permission_evidence_field_present": permission_evidence_column is not None,
+        "private_permission_evidence_references": dict(sorted(private_permission_refs.items())),
         "source_ids_not_applicable": source_ids_not_applicable,
         "contributors_equal_reviewers": contributor_reviewer_same,
         "cross_split_group_ids": split_group_conflicts,
@@ -281,6 +289,7 @@ def main():
     print(f"Source methods: {result['source_methods']}")
     print(f"Permission values: {result['permission_values']}")
     print(f"Permission evidence field present: {result['permission_evidence_field_present']}")
+    print(f"Private permission record references: {result['private_permission_evidence_references']}")
     print(f"Source record IDs marked not applicable or blank: {result['source_ids_not_applicable']}")
     print(f"Review status values: {result['review_statuses']}")
     print(f"Recorded evidence issues: {len(result['recorded_evidence_issues'])}")
@@ -297,7 +306,7 @@ def main():
     if result["recorded_evidence_issues"]:
         print("Resolve the recorded review-status evidence issues listed above.")
     else:
-        print("All rows record an accepted review status and a permission evidence reference; the audit cannot independently judge review quality or interpret permission scope.")
+        print("All rows record an accepted review status and a permission reference. Private evidence is not included or independently verified by this audit.")
 
 
 if __name__ == "__main__":
