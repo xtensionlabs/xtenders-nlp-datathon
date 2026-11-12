@@ -107,6 +107,7 @@ changes, is disclosed in
 ## Project evidence
 
 - [Sauti live demo](https://sauti.jollyground-e681768c.centralindia.azurecontainerapps.io/)
+- [Sauti presentation and demo video](https://drive.google.com/file/d/15205PpFJ1IsgqgwVJjbXi9bssGKrvZhE/view)
 - [Authoritative dataset](Team_22_Dataset_Track_C.csv)
 - [Dataset card](docs/data/dataset_card.md)
 - [Annotation guide](docs/data/annotation_guide.md)
